@@ -2,8 +2,7 @@ package com.elli0tt.ebook_parser.fb2
 
 import android.util.Log
 import android.util.Xml
-import com.elli0tt.ebook_parser.fb2.tags.Description
-import com.elli0tt.ebook_parser.fb2.tags.FictionBook
+import com.elli0tt.ebook_parser.fb2.tags.*
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
 import java.io.InputStream
@@ -13,12 +12,15 @@ class Fb2Parser : Parser {
     private lateinit var xmlParser: XmlPullParser
 
     suspend fun parseBook(inputStream: InputStream) {
+//        printAllTags(inputStream)
+
         xmlParser = XmlPullParserFactory.newInstance().newPullParser()
         xmlParser.setInput(inputStream, null)
         xmlParser.nextTag()
 
         val fictionBookBuilder = FictionBook.Builder()
         parseRoot(fictionBookBuilder)
+
 //        val fb2Book = fb2BookBuilder.build()
     }
 
@@ -178,7 +180,9 @@ class Fb2Parser : Parser {
         Log.d(TAG, "parseAnnotation()")
         xmlParser.checkStartsWithTag(ANNOTATION_TAG)
         parseChildrenTags { tagName ->
-
+            when (tagName) {
+                P_TAG -> parseP()
+            }
         }
     }
 
@@ -262,6 +266,33 @@ class Fb2Parser : Parser {
         }
     }
 
+    private fun parseP() {
+        Log.d(TAG, "parseP()")
+        xmlParser.checkStartsWithTag(P_TAG)
+//        Log.d(TAG, "p: text: ${xmlParser.text}")
+        val pBuilder = P.Builder()
+        while (xmlParser.next() != XmlPullParser.END_TAG && xmlParser.name != P_TAG) {
+            if (xmlParser.eventType == XmlPullParser.START_TAG) {
+                when (xmlParser.name) {
+                    STRONG_TAG -> parseStrong(pBuilder)
+                }
+            }
+            if  (xmlParser.eventType == XmlPullParser.TEXT) {
+                pBuilder.addSubElement(Text(xmlParser.text))
+            }
+        }
+        val p = pBuilder.build()
+        Log.d(TAG, "p subelements: ${p.subElements.joinToString(separator = "|||")}")
+    }
+
+    private fun parseStrong(pBuilder: P.Builder) {
+        Log.d(TAG, "parseStrong()")
+        xmlParser.checkStartsWithTag(STRONG_TAG)
+        while (xmlParser.next() != XmlPullParser.END_TAG && xmlParser.name != STRONG_TAG) {
+            pBuilder.addSubElement(Strong(xmlParser.text))
+        }
+    }
+
     private fun printAllTags(inputStream: InputStream) {
         inputStream.use { stream ->
             val parser = Xml.newPullParser()
@@ -330,6 +361,9 @@ class Fb2Parser : Parser {
         private const val FIRST_NAME_TAG = "first-name"
         private const val MIDDLE_NAME_TAG = "middle-name"
         private const val LAST_NAME_TAG = "last-name"
+
+        private const val P_TAG = "p"
+        private const val STRONG_TAG = "strong"
     }
 
     // map of (tag, handler)
